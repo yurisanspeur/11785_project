@@ -36,9 +36,9 @@ for i, d in enumerate(data):
 X_train, X_test, y_train, y_test = train_test_split(trData, trLabels, test_size=0.2)
 
 # Define the model
-model = defineModel(100, 2, True)
+model = defineModel(100, 2, closed=False)  # FIXME: This should be closed ?
 # Call the train function providing the data in the correct shape format
 # model = trainModelwSPDA(model, 100, 2, True, trData, trLabels, 300, 512)
 model, trainMSE, testMSE = trainAndValidateModelwSPDA(
-    model, 100, 2, True, X_train, y_train, X_test, y_test, 300, 512
+    model, 100, 2, False, X_train, y_train, X_test, y_test, 500, 512
 )

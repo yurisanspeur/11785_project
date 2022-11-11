@@ -256,7 +256,9 @@ def defineModelOpen(length, dim, verbose):
     convlayers.add(MaxPooling1D(pool_size=2, padding="same"))
 
     convlayers.add(CyclicPad())
-    convlayers.add(Conv1D(filters=8, kernel_size=kernalsize, padding="same"))
+    convlayers.add(
+        Conv1D(filters=8 * dim, kernel_size=kernalsize, padding="same")
+    )  # FIXME: 8 * dim ?
     convlayers.add(BatchNormalization(axis=1))
     convlayers.add(Activation(act))
     convlayers.add(MaxPooling1D(pool_size=2, padding="same"))
@@ -333,7 +335,9 @@ def defineModelClosed(length, dim, verbose):
     convlayers.add(Activation(act))
     convlayers.add(MaxPooling1D(pool_size=2, padding="same"))
 
-    convlayers.add(Conv1D(filters=8, kernel_size=kernalsize, padding="same"))
+    convlayers.add(
+        Conv1D(filters=8 * dim, kernel_size=kernalsize, padding="same")
+    )  # FIXME: 8 * dim
     convlayers.add(BatchNormalization(axis=1))
     convlayers.add(Activation(act))
     convlayers.add(MaxPooling1D(pool_size=2, padding="same"))
