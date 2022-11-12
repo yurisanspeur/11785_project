@@ -111,9 +111,29 @@ class Network(nn.Module):
     def __init__(self):
         super(Network, self).__init__()
         self.conv_layer = nn.Sequential(
-            nn.Conv1d(100, 256, 5, padding="same", bias=False),
+            nn.Conv1d(100, 128, 5, padding="same", bias=False),
+            nn.BatchNorm1d(128),
+            nn.ReLU(),
+            #            nn.LeakyReLU(negative_slope=0.2),
+            nn.Conv1d(128, 256, 5, padding="same", bias=False),
             nn.BatchNorm1d(256),
-            nn.LeakyReLU(negative_slope=0.2),
+            nn.ReLU(),
+            #            nn.LeakyReLU(negative_slope=0.2),
+            nn.Conv1d(256, 512, 5, padding="same", bias=False),
+            nn.BatchNorm1d(512),
+            nn.ReLU()
+            #            nn.LeakyReLU(negative_slope=0.2),
+        )
+        self.fc = nn.Sequential(
+            nn.Linear(512, 256),
+            nn.Linear(256, 128),
+            nn.Linear(128, 64),
+            nn.Linear(64, 32),
+            nn.Linear(32, 16),
+            nn.Linear(16, 8),
+            nn.Linear(8, 4),
+            nn.Linear(4, 2),
+            nn.Linear(2, 1),
         )
 
     def forward(self, x):
@@ -121,11 +141,16 @@ class Network(nn.Module):
         c2 = x[:, :, 2:]
         out_c1 = self.conv_layer(c1)
         out_c2 = self.conv_layer(c2)
+        breakpoint()
+        # concatenate the two representations
+        out_cat = torch.cat((out_c1, out_c2), axis=2)
+        out_to_fc = nn.AvgPool1d(4)(out_cat).squeeze()
+        dist = self.fc(out_to_fc).squeeze()
 
-        return out_c1, out_c2
+        return dist
 
 
 model = Network()
-out_c1, out_c2 = model(next(iter(train_loader))[0])
+dist = model(next(iter(train_loader))[0])
 
-print(out_c1.shape, out_c2.shape)
+print(dist)
