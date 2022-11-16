@@ -47,7 +47,7 @@ label = (
 )  # cast as torch.float32 for compatility with layer kernels and should have only batch_size dimension
 
 len_data = cxy_data.shape[0]
-train_len = int(0.7 * len_data)
+train_len = int(0.8 * len_data)
 val_len = int(0.1 * len_data)
 test_len = len_data - train_len - val_len
 generator = torch.Generator()
@@ -89,7 +89,7 @@ val_data = ShapeTrainDataset(val_cxy_data, val_label)
 test_data = ShapeTestDataset(test_cxy_data)
 
 
-BATCH_SIZE = 512
+BATCH_SIZE = 128
 
 train_loader = torch.utils.data.DataLoader(
     train_data, num_workers=8, batch_size=BATCH_SIZE, pin_memory=True, shuffle=True
@@ -122,20 +122,20 @@ class Network(nn.Module):
         self.conv_layer = nn.Sequential(
             nn.Conv1d(100, 128, 5, padding="same", bias=False),
             nn.BatchNorm1d(128),
-            nn.ReLU(),
+            nn.LeakyReLU(negative_slope=0.2),
             #            nn.LeakyReLU(negative_slope=0.2),
-            nn.Conv1d(128, 256, 5, padding="same", bias=False),
-            nn.BatchNorm1d(256),
-            nn.ReLU(),
+            #            nn.Conv1d(128, 256, 5, padding="same", bias=False),
+            #            nn.BatchNorm1d(256),
             #            nn.LeakyReLU(negative_slope=0.2),
-            nn.Conv1d(256, 512, 5, padding="same", bias=False),
-            nn.BatchNorm1d(512),
-            nn.ReLU()
+            #            #            nn.LeakyReLU(negative_slope=0.2),
+            #            nn.Conv1d(256, 512, 5, padding="same", bias=False),
+            #            nn.BatchNorm1d(512),
+            #            nn.LeakyReLU(negative_slope=0.2)
             #            nn.LeakyReLU(negative_slope=0.2),
         )
         self.fc = nn.Sequential(
-            nn.Linear(512, 256),
-            nn.Linear(256, 128),
+            #    nn.Linear(512, 256),
+            #    nn.Linear(256, 128),
             nn.Linear(128, 64),
             nn.Linear(64, 32),
             nn.Linear(32, 16),
@@ -175,11 +175,15 @@ def initialize_weights(m):
 model = Network()
 model.apply(initialize_weights)
 model.to(device)
-config = {"batch_size": BATCH_SIZE, "lr": 8e-3, "epochs": 500}
+config = {"batch_size": BATCH_SIZE, "lr": 2e-3, "epochs": 500}
 criterion = nn.MSELoss()
 optimizer = torch.optim.AdamW(model.parameters(), lr=config["lr"], weight_decay=5e-15)
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-    optimizer, mode="min", factor=0.5, patience=1, verbose=True
+    optimizer,
+    mode="min",
+    factor=0.5,
+    patience=3,
+    verbose=True,  # FIXME: Patience too harsh?
 )
 
 
@@ -266,7 +270,7 @@ torch.cuda.empty_cache()
 gc.collect()
 
 run = wandb.init(
-    name="baseline_GPU",  ### Wandb creates random run names if you skip this field, we recommend you give useful names
+    name="baseline_GPU_more_data_less_depth",  ### Wandb creates random run names if you skip this field, we recommend you give useful names
     reinit=True,  ### Allows reinitalizing runs when you re-run this cell
     project="HW5_project",  ### Project should be created in your wandb account
     config=config,  ### Wandb Config for your run
@@ -274,7 +278,6 @@ run = wandb.init(
 )
 best_val_loss = np.inf
 # TODO: Please complete the training loop
-breakpoint()
 for epoch in range(config["epochs"]):
 
     # one training step
@@ -312,7 +315,7 @@ for epoch in range(config["epochs"]):
                 "val_loss": val_loss,
                 "epoch": epoch,
             },
-            "./HW5_project_GPU.pth",
+            "./HW5_project_GPU_more_data_less_depth.pth",
         )
         best_val_loss = val_loss
-        wandb.save("checkpoint_GPU.pth")
+        wandb.save("checkpoint_GPU_more_data_less_depth.pth")
