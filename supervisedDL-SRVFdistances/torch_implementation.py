@@ -116,7 +116,7 @@ print(
     )
 )
 
-# Define the model
+
 class Network(nn.Module):
     def __init__(self, dim, length):
         super(Network, self).__init__()
@@ -167,16 +167,16 @@ class Network(nn.Module):
         self.fc = nn.Sequential(
             nn.Flatten(),
             nn.Linear(
-                512 * length * 2, 256
+                256 * dim * length * 2, 256 * dim
             ),  # 2 here is to accomodate for the concatenation of shape representations
-            nn.Linear(256, 128),
-            nn.Linear(128, 64),
-            nn.Linear(64, 32),
-            nn.Linear(32, 16),
-            nn.Linear(16, 8),
-            nn.Linear(8, 4),
-            nn.Linear(4, 2),
-            nn.Linear(2, 1),
+            nn.ReLU(),
+            nn.Linear(256 * dim, 64 * dim),
+            nn.ReLU(),
+            nn.Linear(64 * dim, 16 * dim),
+            nn.ReLU(),
+            nn.Linear(16 * dim, 4 * dim),
+            nn.ReLU(),
+            nn.Linear(4 * dim, 1),
         )
 
     def forward(self, x):
