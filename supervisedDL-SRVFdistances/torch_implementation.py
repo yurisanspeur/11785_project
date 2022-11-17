@@ -166,7 +166,9 @@ class Network(nn.Module):
         )
         self.fc = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(512 * length * dim, 256),
+            nn.Linear(
+                512 * length * 2, 256
+            ),  # 2 here is to accomodate for the concatenation of shape representations
             nn.Linear(256, 128),
             nn.Linear(128, 64),
             nn.Linear(64, 32),
