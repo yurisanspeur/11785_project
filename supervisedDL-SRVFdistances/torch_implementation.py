@@ -18,9 +18,9 @@ data = np.load(
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(device)
 
-wandb.login(
-    key="4a7d69aeafc0f3c0c442c337417b282a3231e52e"
-)  # API Key is in your wandb account, under settings (wandb.ai/settings)
+# wandb.login(
+#    key="4a7d69aeafc0f3c0c442c337417b282a3231e52e"
+# )  # API Key is in your wandb account, under settings (wandb.ai/settings)
 c1_xs = []
 c1_gs = []
 c2_xs = []
@@ -37,10 +37,11 @@ for i in range(len(data)):
     # c1_gs = np.array(c1_gs)
     # c2_xs = np.array(c2_xs)
     # c2_gs = np.array(c2_gs)
-    # dists = np.array([dists]).T
 
 cxy_data = np.concatenate((c1_xs, c2_xs), axis=2)
 dists = torch.FloatTensor(np.array([dists]).T)
+# cxy_data = data["otrData"]
+# dists = torch.FloatTensor(data["otrLabels"])
 cxy_data = torch.FloatTensor(cxy_data)  # cast as a torch.float32 tensor
 label = (
     dists.squeeze()
@@ -117,12 +118,42 @@ print(
 
 # Define the model
 class Network(nn.Module):
-    def __init__(self):
+    def __init__(self, dim, length):
         super(Network, self).__init__()
+        self.dim = dim
         self.conv_layer = nn.Sequential(
-            nn.Conv1d(100, 128, 5, padding="same", bias=False),
-            nn.BatchNorm1d(128),
-            nn.LeakyReLU(negative_slope=0.2),
+            nn.Conv1d(dim, 2 * dim, 5, padding="same", bias=False),
+            nn.BatchNorm1d(2 * dim),
+            nn.ReLU(),
+            nn.Conv1d(2 * dim, 4 * dim, 5, padding="same", bias=False),
+            nn.BatchNorm1d(4 * dim),
+            nn.ReLU(),
+            # nn.MaxPool1d(2, padding="same"),
+            nn.Conv1d(4 * dim, 8 * dim, 5, padding="same", bias=False),
+            nn.BatchNorm1d(8 * dim),
+            nn.ReLU(),
+            # nn.MaxPool1d(2, padding="same"),
+            nn.Conv1d(8 * dim, 16 * dim, 5, padding="same", bias=False),
+            nn.BatchNorm1d(16 * dim),
+            nn.ReLU(),
+            # nn.MaxPool1d(2, padding="same"),
+            nn.Conv1d(16 * dim, 32 * dim, 5, padding="same", bias=False),
+            nn.BatchNorm1d(32 * dim),
+            nn.ReLU(),
+            # nn.MaxPool1d(2, padding="same"),
+            nn.Conv1d(32 * dim, 64 * dim, 5, padding="same", bias=False),
+            nn.BatchNorm1d(64 * dim),
+            nn.ReLU(),
+            # nn.MaxPool1d(2, padding="same"),
+            nn.Conv1d(64 * dim, 128 * dim, 5, padding="same", bias=False),
+            nn.BatchNorm1d(128 * dim),
+            nn.ReLU(),
+            # nn.MaxPool1d(2, padding="same"),
+            nn.Conv1d(128 * dim, 256 * dim, 5, padding="same", bias=False),
+            nn.BatchNorm1d(256 * dim),
+            nn.ReLU(),
+            # nn.MaxPool1d(2, padding="same"),
+            # nn.LeakyReLU(negative_slope=0.2),
             #            nn.LeakyReLU(negative_slope=0.2),
             #            nn.Conv1d(128, 256, 5, padding="same", bias=False),
             #            nn.BatchNorm1d(256),
@@ -134,8 +165,9 @@ class Network(nn.Module):
             #            nn.LeakyReLU(negative_slope=0.2),
         )
         self.fc = nn.Sequential(
-            #    nn.Linear(512, 256),
-            #    nn.Linear(256, 128),
+            nn.Flatten(),
+            nn.Linear(512 * length * dim, 256),
+            nn.Linear(256, 128),
             nn.Linear(128, 64),
             nn.Linear(64, 32),
             nn.Linear(32, 16),
@@ -146,14 +178,17 @@ class Network(nn.Module):
         )
 
     def forward(self, x):
-        c1 = x[:, :, :2]
-        c2 = x[:, :, 2:]
-        out_c1 = self.conv_layer(c1)
-        out_c2 = self.conv_layer(c2)
+        c1 = x[:, :, : self.dim]
+        c2 = x[:, :, self.dim :]
+        c1_perm = c1.permute(0, 2, 1)
+        c2_perm = c2.permute(0, 2, 1)
+        out_c1 = self.conv_layer(c1_perm)
+        out_c2 = self.conv_layer(c2_perm)
         # concatenate the two representations
-        out_cat = torch.cat((out_c1, out_c2), axis=2)
-        out_to_fc = nn.AvgPool1d(4)(out_cat).squeeze()
-        dist = self.fc(out_to_fc).squeeze()
+        out_cat = torch.cat((out_c1.permute(0, 2, 1), out_c2.permute(0, 2, 1)), axis=2)
+
+        #        out_to_fc = nn.AvgPool1d(2)(out_cat).squeeze() #FIXME: Think this is destroying all the featurization ; flatten instead
+        dist = self.fc(out_cat).squeeze()
 
         return dist
 
@@ -172,7 +207,7 @@ def initialize_weights(m):
             torch.nn.init.zeros_(m.bias)
 
 
-model = Network()
+model = Network(dim=2, length=100)
 model.apply(initialize_weights)
 model.to(device)
 config = {"batch_size": BATCH_SIZE, "lr": 2e-3, "epochs": 500}
