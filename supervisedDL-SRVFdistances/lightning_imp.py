@@ -142,3 +142,106 @@ class MyDataModule(LightningDataModule):
             num_workers=8,
             collate_fn=self.test_collate_fn,
         )
+
+
+
+class CyclicPad(nn.Module):
+    def __init__(self, **kwargs):
+        self.kernelsize = 5
+        super(CyclicPad, self).__init__(**kwargs)
+
+    def forward(self, inputs):
+        length = inputs.shape[1] # number of samples 100
+        n = math.floor(self.kernelsize / 2) # 2
+        a = inputs[:, length - n : length, :]
+        b = inputs[:, 0:n, :]
+
+        return tf.concat([a, inputs, b], 1)
+
+
+class LayerNorm(nn.Module):
+    def __init__(self, c1, c2):
+
+        self.c1 = c1
+        self.c2 = c2
+    def forward(self):
+        return (self.c1 - self.c2) ** 2
+
+
+
+class Network(LightningModule):
+    def __init__(self, dim, length):
+        super(Network, self).__init__()
+        self.dim = dim
+        self.conv_layer = nn.Sequential(
+            nn.Conv1d(dim, 2 * dim, 5, padding="same", bias=False),
+            nn.BatchNorm1d(2 * dim),
+            nn.ReLU(),
+            nn.Conv1d(2 * dim, 4 * dim, 5, padding="same", bias=False),
+            nn.BatchNorm1d(4 * dim),
+            nn.ReLU(),
+            # nn.MaxPool1d(2, padding="same"),
+            nn.Conv1d(4 * dim, 8 * dim, 5, padding="same", bias=False),
+            nn.BatchNorm1d(8 * dim),
+            nn.ReLU(),
+            # nn.MaxPool1d(2, padding="same"),
+            nn.Conv1d(8 * dim, 16 * dim, 5, padding="same", bias=False),
+            nn.BatchNorm1d(16 * dim),
+            nn.ReLU(),
+            # nn.MaxPool1d(2, padding="same"),
+            nn.Conv1d(16 * dim, 32 * dim, 5, padding="same", bias=False),
+            nn.BatchNorm1d(32 * dim),
+            nn.ReLU(),
+            # nn.MaxPool1d(2, padding="same"),
+            nn.Conv1d(32 * dim, 64 * dim, 5, padding="same", bias=False),
+            nn.BatchNorm1d(64 * dim),
+            nn.ReLU(),
+            # nn.MaxPool1d(2, padding="same"),
+            nn.Conv1d(64 * dim, 128 * dim, 5, padding="same", bias=False),
+            nn.BatchNorm1d(128 * dim),
+            nn.ReLU(),
+            # nn.MaxPool1d(2, padding="same"),
+            nn.Conv1d(128 * dim, 256 * dim, 5, padding="same", bias=False),
+            nn.BatchNorm1d(256 * dim),
+            nn.ReLU(),
+            # nn.MaxPool1d(2, padding="same"),
+            # nn.LeakyReLU(negative_slope=0.2),
+            #            nn.LeakyReLU(negative_slope=0.2),
+            #            nn.Conv1d(128, 256, 5, padding="same", bias=False),
+            #            nn.BatchNorm1d(256),
+            #            nn.LeakyReLU(negative_slope=0.2),
+            #            #            nn.LeakyReLU(negative_slope=0.2),
+            #            nn.Conv1d(256, 512, 5, padding="same", bias=False),
+            #            nn.BatchNorm1d(512),
+            #            nn.LeakyReLU(negative_slope=0.2)
+            #            nn.LeakyReLU(negative_slope=0.2),
+        )
+        self.fc = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(
+                256 * dim * length * 2, 256 * dim
+            ),  # 2 here is to accomodate for the concatenation of shape representations
+            nn.ReLU(),
+            nn.Linear(256 * dim, 64 * dim),
+            nn.ReLU(),
+            nn.Linear(64 * dim, 16 * dim),
+            nn.ReLU(),
+            nn.Linear(16 * dim, 4 * dim),
+            nn.ReLU(),
+            nn.Linear(4 * dim, 1),
+        )
+
+    def forward(self, x):
+        c1 = x[:, :, : self.dim]
+        c2 = x[:, :, self.dim :]
+        c1_perm = c1.permute(0, 2, 1)
+        c2_perm = c2.permute(0, 2, 1)
+        out_c1 = self.conv_layer(c1_perm)
+        out_c2 = self.conv_layer(c2_perm)
+        # concatenate the two representations
+        out_cat = torch.cat((out_c1.permute(0, 2, 1), out_c2.permute(0, 2, 1)), axis=2)
+
+        #        out_to_fc = nn.AvgPool1d(2)(out_cat).squeeze() #FIXME: Think this is destroying all the featurization ; flatten instead
+        dist = self.fc(out_cat).squeeze()
+
+        return dist
