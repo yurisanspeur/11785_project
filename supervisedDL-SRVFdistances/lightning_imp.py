@@ -293,25 +293,26 @@ checkpoint_callback = ModelCheckpoint(
         filename="Salil-{epoch}-{step}-{val_loss:.4f}",
     )
 learning_rate_callback = LearningRateMonitor(logging_interval="epoch")
-trainer = pl.Trainer(
-    gpus=1,
-    # deterministic=True,
-    max_epochs=10000,
-    # precision=16,
-    # gradient_clip_val=0.5,
-    # gradient_clip_algorithm="value",
-    # strategy="ddp",
-    #logger=wandb_logger,
-    callbacks=[learning_rate_callback, checkpoint_callback],
-)
+#trainer = pl.Trainer(
+#    gpus=1,
+#    # deterministic=True,
+#    max_epochs=10000,
+#    # precision=16,
+#    # gradient_clip_val=0.5,
+#    # gradient_clip_algorithm="value",
+#    # strategy="ddp",
+#    #logger=wandb_logger,
+#    callbacks=[learning_rate_callback, checkpoint_callback],
+#)
 dm = MyDataModule(batch_size=128,train_set=train_data, val_set=val_data, test_set=test_data)
 model = DistanceModel(dim=2)
-trainer.fit(
-    model,
-    dm.train_dataloader(),
-    dm.val_dataloader(),
-)
-bmp = checkpoint_callback.best_model_path
+#trainer.fit(
+#    model,
+#    dm.train_dataloader(),
+#    dm.val_dataloader(),
+#)
+#bmp = checkpoint_callback.best_model_path
+bmp = 'oblika_ckpts/Salil-epoch=17-step=8064-val_loss=19.5324.ckpt'
 
 model.load_state_dict(torch.load(f"{bmp}")['state_dict'])
 model = model.to(device)
@@ -320,12 +321,10 @@ pred_dists = []
 dist_labels = []
 fig = plt.figure(figsize=(10.,10))
 ax = fig.add_subplot(111)
-breakpoint()
 with torch.no_grad():
     for test_batch in dm.test_dataloader():
-        test_batch = test_batch.to(device)
-        pred_dist = model(test_batch)
-        pred_dist.extend(pred_dist.cpu().numpy().tolist())
+        pred_dist = model((test_batch[0].to(device), test_batch[1].to(device)))
+        pred_dists.extend(pred_dist.cpu().numpy().tolist())
         dist_labels.extend(test_batch[1].cpu().numpy().tolist())
 
 ax.plot(np.linspace(0, max(dist_labels)), np.linspace(0, max(dist_labels)),'k--')
