@@ -165,17 +165,18 @@ class CyclicPad(nn.Module):
 
 
 class LayerNorm(nn.Module):
-    def __init__(self, c1, c2):
-        self.c1 = c1
-        self.c2 = c2
-    def forward(self):
-        return (self.c1 - self.c2) ** 2
+
+    def __init__(self):
+        super(LayerNorm, self).__init__()
+
+    def forward(self, c1, c2):
+        return torch.sum((c1 - c2) ** 2,dim=(1,2))
 
 
 
-class Network(LightningModule):
-    def __init__(self, dim, length):
-        super(Network, self).__init__()
+class DistanceModel(LightningModule):
+    def __init__(self, dim):
+        super(DistanceModel, self).__init__()
         self.dim = dim
         self.conv_layer = nn.Sequential(
             CyclicPad(),
@@ -245,8 +246,8 @@ class Network(LightningModule):
         self.layer_norm = LayerNorm()
 
     def forward(self, x):
-        c1 = x[:, :self.dim, :]
-        c2 = x[:, self.dim:,:]
+        c1 = x[0][:, :self.dim, :]
+        c2 = x[0][:, self.dim:,:]
         #c1_perm = c1.permute(0, 2, 1)
         #c2_perm = c2.permute(0, 2, 1)
         out_c1 = self.conv_layer(c1)
@@ -256,7 +257,8 @@ class Network(LightningModule):
 
         #        out_to_fc = nn.AvgPool1d(2)(out_cat).squeeze() #FIXME: Think this is destroying all the featurization ; flatten instead
         #dist = self.fc(out_cat).squeeze()
-        self.layer_norm(out_c1, out_c2)
+        dist = self.layer_norm(out_c1, out_c2)
+        breakpoint()
 
         return dist
 
@@ -266,6 +268,13 @@ class Network(LightningModule):
 dm = MyDataModule(batch_size=128,train_set=train_data, val_set=val_data, test_set=test_data)
 
 trainloader = dm.train_dataloader()
+
+model = DistanceModel(dim=2)
+out = model(next(iter(trainloader)))
+print(out)
+
+
+
 
 
 
