@@ -258,9 +258,62 @@ class DistanceModel(LightningModule):
         #        out_to_fc = nn.AvgPool1d(2)(out_cat).squeeze() #FIXME: Think this is destroying all the featurization ; flatten instead
         #dist = self.fc(out_cat).squeeze()
         dist = self.layer_norm(out_c1, out_c2)
-        breakpoint()
 
         return dist
+
+    def training_step(self, batch, batch_idx):
+        preds = self(batch).squeeze()
+        loss = nn.MSELoss()(preds, batch[1].type(preds.dtype))
+        self.log("training_loss", loss, on_epoch=True)
+        return {"loss": loss}
+
+    def validation_step(self, batch, batch_idx):
+        preds = self(batch).squeeze()
+        loss = nn.MSELoss()(preds, batch[1].type(preds.dtype))
+        self.log("val_loss", loss, on_epoch=True)
+        return {"val_loss": loss}
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3, weight_decay=1e-5)
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": ReduceLROnPlateau(
+                    optimizer, mode="min", patience=50, factor=0.5
+                ),
+                "interval": "epoch",
+                "frequency": 1,
+                "monitor": "val_loss",
+            },
+        }
+checkpoint_callback = ModelCheckpoint(
+        monitor="val_loss",  # need to implement recall score (tp / (tp + fn))
+        mode="min",
+        dirpath="magmom_checkpoints",
+        filename="regressor_mag_only_abs0.6-{epoch}-{step}-{embedding_val_loss:.4f}",
+    )
+learning_rate_callback = LearningRateMonitor(logging_interval="epoch")
+trainer = pl.Trainer(
+    gpus=1,
+    # deterministic=True,
+    max_epochs=10000,
+    # precision=16,
+    # gradient_clip_val=0.5,
+    # gradient_clip_algorithm="value",
+    # strategy="ddp",
+    logger=wandb_logger,
+    callbacks=[learning_rate_callback, checkpoint_callback],
+)
+trainer.fit(
+    model,
+    dm.train_dataloader(),
+    dm.val_dataloader(),
+)
+breakpoint()
+bmp = checkpoint_callback.best_model_path
+
+
+
 
 
 
