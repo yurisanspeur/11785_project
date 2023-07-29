@@ -289,8 +289,8 @@ class DistanceModel(LightningModule):
 checkpoint_callback = ModelCheckpoint(
         monitor="val_loss",  # need to implement recall score (tp / (tp + fn))
         mode="min",
-        dirpath="magmom_checkpoints",
-        filename="regressor_mag_only_abs0.6-{epoch}-{step}-{embedding_val_loss:.4f}",
+        dirpath="oblika_ckpts",
+        filename="Salil-{epoch}-{step}-{val_loss:.4f}",
     )
 learning_rate_callback = LearningRateMonitor(logging_interval="epoch")
 trainer = pl.Trainer(
@@ -309,22 +309,40 @@ trainer.fit(
     dm.train_dataloader(),
     dm.val_dataloader(),
 )
-breakpoint()
 bmp = checkpoint_callback.best_model_path
 
+model.load_state_dict(torch.load(f"{bmp}")['state_dict'])
+model = model.to(device)
+
+pred_dists = []
+dist_labels = []
+fig = plt.figure(figsize=(10.,10))
+ax = fig.add_subplot(111)
+
+with torch.no_grad():
+    for test_batch in dm.test_dataloader():
+        test_batch = test_batch.to(device)
+        pred_dist = model(test_batch)
+        pred_dist.extend(pred_dist.cpu().numpy().tolist())
+        dist_labels.extend(test_batch[1].cpu().numpy().tolist())
+
+ax.plot(np.linspace(0, max(dist_labels)), np.linspace(0, max(dist_labels)),'k--')
+ax.scatter(dist_labels, pred_dists, c='b')
+ax.set_xlabel('Dist Labels')
+ax.set_ylabel('Pred Labels')
+
+fig.savefig('Parity_Plot.png')
 
 
 
 
-
-
-dm = MyDataModule(batch_size=128,train_set=train_data, val_set=val_data, test_set=test_data)
-
-trainloader = dm.train_dataloader()
-
-model = DistanceModel(dim=2)
-out = model(next(iter(trainloader)))
-print(out)
+#dm = MyDataModule(batch_size=128,train_set=train_data, val_set=val_data, test_set=test_data)
+#
+#trainloader = dm.train_dataloader()
+#
+#model = DistanceModel(dim=2)
+#out = model(next(iter(trainloader)))
+#print(out)
 
 
 
