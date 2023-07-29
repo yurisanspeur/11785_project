@@ -10,7 +10,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau, CyclicLR, CosineAnnealin
 from matplotlib import pyplot as plt
 import os
 import math
-#wandb_logger = WandbLogger(project="Oblika", name="cyclic_pad_model_more_patient")
+wandb_logger = WandbLogger(project="Oblika", name="cyclic_pad_model_MSELoss")
 
 #data = np.load(
 #    "massive_training_data_distances.pickle",
@@ -293,27 +293,26 @@ checkpoint_callback = ModelCheckpoint(
         filename="Salil-{epoch}-{step}-{val_loss:.4f}",
     )
 learning_rate_callback = LearningRateMonitor(logging_interval="epoch")
-#trainer = pl.Trainer(
-#    gpus=1,
-#    # deterministic=True,
-#    max_epochs=10000,
-#    # precision=16,
-#    # gradient_clip_val=0.5,
-#    # gradient_clip_algorithm="value",
-#    # strategy="ddp",
-#    #logger=wandb_logger,
-#    callbacks=[learning_rate_callback, checkpoint_callback],
-#)
+trainer = pl.Trainer(
+    gpus=1,
+    # deterministic=True,
+    max_epochs=10000,
+    # precision=16,
+    # gradient_clip_val=0.5,
+    # gradient_clip_algorithm="value",
+    # strategy="ddp",
+    logger=wandb_logger,
+    callbacks=[learning_rate_callback, checkpoint_callback],
+)
 dm = MyDataModule(batch_size=128,train_set=train_data, val_set=val_data, test_set=test_data)
 model = DistanceModel(dim=2)
-#trainer.fit(
-#    model,
-#    dm.train_dataloader(),
-#    dm.val_dataloader(),
-#)
-#bmp = checkpoint_callback.best_model_path
-bmp = 'oblika_ckpts/Salil-epoch=17-step=8064-val_loss=19.5324.ckpt'
-
+trainer.fit(
+    model,
+    dm.train_dataloader(),
+    dm.val_dataloader(),
+)
+bmp = checkpoint_callback.best_model_path
+#bmp = 'oblika_ckpts/Salil-epoch=17-step=8064-val_loss=19.5324.ckpt'
 model.load_state_dict(torch.load(f"{bmp}")['state_dict'])
 model = model.to(device)
 
