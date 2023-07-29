@@ -301,9 +301,11 @@ trainer = pl.Trainer(
     # gradient_clip_val=0.5,
     # gradient_clip_algorithm="value",
     # strategy="ddp",
-    logger=wandb_logger,
+    #logger=wandb_logger,
     callbacks=[learning_rate_callback, checkpoint_callback],
 )
+dm = MyDataModule(batch_size=128,train_set=train_data, val_set=val_data, test_set=test_data)
+model = DistanceModel(dim=2)
 trainer.fit(
     model,
     dm.train_dataloader(),
@@ -318,7 +320,7 @@ pred_dists = []
 dist_labels = []
 fig = plt.figure(figsize=(10.,10))
 ax = fig.add_subplot(111)
-
+breakpoint()
 with torch.no_grad():
     for test_batch in dm.test_dataloader():
         test_batch = test_batch.to(device)
@@ -336,11 +338,9 @@ fig.savefig('Parity_Plot.png')
 
 
 
-#dm = MyDataModule(batch_size=128,train_set=train_data, val_set=val_data, test_set=test_data)
 #
 #trainloader = dm.train_dataloader()
 #
-#model = DistanceModel(dim=2)
 #out = model(next(iter(trainloader)))
 #print(out)
 
