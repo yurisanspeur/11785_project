@@ -10,7 +10,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau, CyclicLR, CosineAnnealin
 from matplotlib import pyplot as plt
 import os
 import math
-wandb_logger = WandbLogger(project="Oblika", name="cyclic_pad_model_MSELoss")
+wandb_logger = WandbLogger(project="Oblika", name="cyclic_pad_model_L1Loss_new_shape")
 
 #data = np.load(
 #    "massive_training_data_distances.pickle",
@@ -172,8 +172,6 @@ class LayerNorm(nn.Module):
     def forward(self, c1, c2):
         return torch.sum((c1 - c2) ** 2,dim=(1,2))
 
-
-
 class DistanceModel(LightningModule):
     def __init__(self, dim):
         super(DistanceModel, self).__init__()
@@ -263,13 +261,15 @@ class DistanceModel(LightningModule):
 
     def training_step(self, batch, batch_idx):
         preds = self(batch).squeeze()
-        loss = nn.MSELoss()(preds, batch[1].type(preds.dtype))
+        targs = batch[1].squeeze()
+        loss = nn.L1Loss()(preds, targs.type(preds.dtype))
         self.log("training_loss", loss, on_epoch=True)
         return {"loss": loss}
 
     def validation_step(self, batch, batch_idx):
         preds = self(batch).squeeze()
-        loss = nn.MSELoss()(preds, batch[1].type(preds.dtype))
+        targs = batch[1].squeeze()
+        loss = nn.L1Loss()(preds, targs.type(preds.dtype))
         self.log("val_loss", loss, on_epoch=True)
         return {"val_loss": loss}
 
@@ -290,7 +290,7 @@ checkpoint_callback = ModelCheckpoint(
         monitor="val_loss",  # need to implement recall score (tp / (tp + fn))
         mode="min",
         dirpath="oblika_ckpts",
-        filename="Salil-{epoch}-{step}-{val_loss:.4f}",
+        filename="new_shape_Salil-{epoch}-{step}-{val_loss:.4f}",
     )
 learning_rate_callback = LearningRateMonitor(logging_interval="epoch")
 trainer = pl.Trainer(
@@ -306,14 +306,15 @@ trainer = pl.Trainer(
 )
 dm = MyDataModule(batch_size=128,train_set=train_data, val_set=val_data, test_set=test_data)
 model = DistanceModel(dim=2)
+#bmp = 'oblika_ckpts/CP_more_patient-epoch=805-step=361088-val_MAE_loss=0.1184.ckpt'
+#model.load_state_dict(torch.load(f"{bmp}")['state_dict'])
 trainer.fit(
     model,
     dm.train_dataloader(),
     dm.val_dataloader(),
 )
 bmp = checkpoint_callback.best_model_path
-#bmp = 'oblika_ckpts/Salil-epoch=17-step=8064-val_loss=19.5324.ckpt'
-model.load_state_dict(torch.load(f"{bmp}")['state_dict'])
+breakpoint()
 model = model.to(device)
 
 pred_dists = []
@@ -331,7 +332,7 @@ ax.scatter(dist_labels, pred_dists, c='b')
 ax.set_xlabel('Dist Labels')
 ax.set_ylabel('Pred Labels')
 
-fig.savefig('Parity_Plot.png')
+fig.savefig('Parity_Plot_back_again.png')
 
 
 
