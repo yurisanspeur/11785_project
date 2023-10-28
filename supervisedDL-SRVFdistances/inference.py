@@ -1,16 +1,21 @@
 import pickle, numpy as np
 #import torch.nn as nn
-#import torch
+import torch
 
 from tensorflow.keras.models import load_model
+from lightning_imp import DistanceModel
 
 # Load the template DB - this is what we match against
 template = pickle.load(open("debug_template.pickle", "rb"))
 
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # Load the intake - this is what is unknown and needs to be recognized
-intake = pickle.load(open("test_intake.pickle", "rb"))
-
+intake = pickle.load(open("list_resampled_chars.pickle", "rb"))
+light_model = DistanceModel(2).to(device)
+bmp = 'oblika_ckpts/CP_more_patient-epoch=805-step=361088-val_MAE_loss=0.1184.ckpt'
+light_model.load_state_dict(torch.load(f"{bmp}")['state_dict'])
+#intake = pickle.load(open("screenshot_11785.pickle", "rb"))
 
 #class Network(nn.Module):
 #    def __init__(self, dim, length):
@@ -95,19 +100,25 @@ intake = pickle.load(open("test_intake.pickle", "rb"))
 #    torch.load("HW5_project_GPU_more_data_less_depth.pth")["model_state_dict"]
 #)
 # Load our surrogate model for shape distances
-model = load_model("OCR")  # Tensorflow
-
-intake_arr_b = np.empty((len(template) * len(intake),100,2))
-template_arr_b = np.empty((len(template) * len(intake),100,2))
+#model = load_model("OCR")  # Tensorflow
+intake = intake[:60]
+intake_arr_b = np.empty((len(template) * len(intake),2,100))
+template_arr_b = np.empty((len(template) * len(intake),2,100))
 intake_results = [""] * len(intake)
 for i, intake_char in enumerate(intake):
-    min_dist = np.inf
+    # min_dist = np.inf
     # Create an empty matrix to house the i,j for all j
     for j, template_char in enumerate(template):  # FIXME: Much more efficient to accumulate each pairs per intake and then feed it to predict as a batch
-        intake_arr = np.asarray(intake_char["c__x"])
+        #intake_arr = np.asarray(intake_char["c__x"])
+        intake_arr = np.asarray(intake_char["x"])
+        print(intake_arr.shape)
+        if intake_arr.shape != (100,2):
+            print("Skipping intake char because shape is messed up!")
+            continue
         template_arr = np.asarray(template_char["c"]["x"])
-        intake_arr_b[i * len(template) + j,:,:] = intake_arr
-        template_arr_b[i * len(template) + j,:,:] = template_arr
+        #intake_arr = np.asarray(intake[intake_char]['x'])
+        intake_arr_b[i * len(template) + j,:,:] = intake_arr.T
+        template_arr_b[i * len(template) + j,:,:] = template_arr.T
         # Add the batch dimension
 #        intake_arr = intake_arr[np.newaxis, ...]
 #        template_arr = template_arr[np.newaxis, ...]
@@ -123,13 +134,17 @@ for i, intake_char in enumerate(intake):
 #            intake_results[i] = template_char["char"]
 #            min_dist = dist
 # Push all the shape pairs to the GPU
-
-dists = model.predict([intake_arr_b, template_arr_b]).reshape((len(intake), len(template)))
+c1s = torch.tensor(intake_arr_b)
+c2s = torch.tensor(template_arr_b)
+x = [torch.cat([c1s, c2s], dim=1).to(device).type(light_model.conv_layer[1].weight.dtype)]
+dists = light_model(x).reshape(len(intake), len(template)).detach().cpu().numpy()
+#dists = model.predict([intake_arr_b, template_arr_b]).reshape((len(intake), len(template)))
+#dists = model.predict([template_arr_b, intake_arr_b]).reshape((len(intake), len(template)))
 # Find the closest match for unknown character relative to the characters that compose our database
 indices = np.argmin(dists,axis=1)
 # Decode the characters per min indices and associated template characters
 intake_result = [template[i]['char'] for i in indices]
-
-
-
+print("".join(intake_result))
 breakpoint()
+
+
