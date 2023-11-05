@@ -79,8 +79,8 @@ class MyDataModule(LightningDataModule):
 
 class CyclicPad(nn.Module):
     def __init__(self, **kwargs):
-        self.kernelsize = 5
         super(CyclicPad, self).__init__(**kwargs)
+        self.kernelsize = 5
 
     def forward(self, inputs): # (B, F, N)
 
@@ -102,54 +102,106 @@ class LayerNorm(nn.Module):
     def forward(self, c1, c2):
         return torch.sum((c1 - c2) ** 2,dim=(1,2))
 
+
+class ConvBlock(nn.Module):
+
+    def __init__(self, in_features, out_features):
+        super(ConvBlock, self).__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.cyclic_pad = CyclicPad()
+        self.conv = nn.Conv1d(in_features, out_features,5, padding="same",bias=False)
+        self.bn = nn.BatchNorm1d(out_features)
+        self.relu = nn.ReLU()
+
+
+    def forward(self, x):
+        x = self.relu(self.bn(self.conv(self.cyclic_pad(x))))
+        return x
+
+class LinearBlock(nn.Module):
+
+    def __init__(self, in_features, out_features):
+        super(LinearBlock, self).__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.lin = nn.Linear(in_features, out_features)
+        self.bn = nn.BatchNorm1d(out_features)
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        x = x.permute(0,2,1) # so that batchnorm acts on feature dimension
+        x = self.lin(x)
+        x = x.permute(0,2,1) # B,F,N
+        x = self.bn(x)
+        x = self.relu(x)
+        return x
+
+
 class DistanceModel(LightningModule):
-    def __init__(self, dim):
+    def __init__(self, dim, num_conv_blocks):
         super(DistanceModel, self).__init__()
         self.dim = dim
-        self.conv_layer = nn.Sequential(
-            CyclicPad(),
-            nn.Conv1d(dim, 2 * dim, 5, padding="same", bias=False),
-            nn.BatchNorm1d(2 * dim),
-            nn.ReLU(),
-            CyclicPad(),
-            nn.Conv1d(2 * dim, 4 * dim, 5, padding="same", bias=False),
-            nn.BatchNorm1d(4 * dim),
-            nn.ReLU(),
-            #nn.MaxPool1d(kernel_size=5,padding=2),
-            CyclicPad(),
-            nn.Conv1d(4 * dim, 8 * dim, 5, padding="same", bias=False),
-            nn.BatchNorm1d(8 * dim),
-            nn.ReLU(),
-            #nn.MaxPool1d(kernel_size=5,padding=2),
-            # nn.MaxPool1d(2, padding="same"),
-            CyclicPad(),
-            nn.Conv1d(8 * dim, 16 * dim, 5, padding="same", bias=False),
-            nn.BatchNorm1d(16 * dim),
-            nn.ReLU(),
-            #nn.MaxPool1d(kernel_size=5,padding=2),
-            # nn.MaxPool1d(2, padding="same"),
-            CyclicPad(),
-            nn.Conv1d(16 * dim, 32 * dim, 5, padding="same", bias=False),
-            nn.BatchNorm1d(32 * dim),
-            nn.ReLU(),
-            #nn.MaxPool1d(kernel_size=5,padding=2),
-            # nn.MaxPool1d(2, padding="same"),
-            CyclicPad(),
-            nn.Conv1d(32 * dim, 64 * dim, 5, padding="same", bias=False),
-            nn.BatchNorm1d(64 * dim),
-            nn.ReLU(),
-            #nn.MaxPool1d(kernel_size=5,padding=2),
-            # nn.MaxPool1d(2, padding="same"),
-            CyclicPad(),
-            nn.Conv1d(64 * dim, 128 * dim, 5, padding="same", bias=False),
-            nn.BatchNorm1d(128 * dim),
-            nn.ReLU(),
-            #nn.MaxPool1d(kernel_size=5,padding=2),
-            # nn.MaxPool1d(2, padding="same"),
-            CyclicPad(),
-            nn.Conv1d(128 * dim, 256 * dim, 5, padding="same", bias=False),
-            nn.BatchNorm1d(256 * dim),
-            nn.ReLU(),
+        conv_blocks = [ConvBlock(dim, 2*dim)]
+        for i in range(num_conv_blocks - 1):
+            in_features = conv_blocks[i].out_features
+            conv_blocks.append(ConvBlock(in_features, 2*in_features))
+
+        self.conv_layer = nn.Sequential(*conv_blocks)
+        linear_blocks = [LinearBlock(conv_blocks[-1].out_features,int(conv_blocks[-1].out_features/2))]
+
+        lin_features = int(linear_blocks[-1].out_features)
+        while lin_features >= 4:
+            lin_features = int(linear_blocks[-1].out_features)
+            linear_blocks.append(LinearBlock(lin_features, int(lin_features/2)))
+            lin_features /= 2
+
+        self.linear_layer = nn.Sequential(*linear_blocks)
+
+        #self.conv_layer = nn.Sequential(
+        #    CyclicPad(),
+        #    nn.Conv1d(dim, 2 * dim, 5, padding="same", bias=False),
+        #    nn.BatchNorm1d(2 * dim),
+        #    nn.ReLU(),
+        #    CyclicPad(),
+        #    nn.Conv1d(2 * dim, 4 * dim, 5, padding="same", bias=False),
+        #    nn.BatchNorm1d(4 * dim),
+        #    nn.ReLU(),
+        #    #nn.MaxPool1d(kernel_size=5,padding=2),
+        #    CyclicPad(),
+        #    nn.Conv1d(4 * dim, 8 * dim, 5, padding="same", bias=False),
+        #    nn.BatchNorm1d(8 * dim),
+        #    nn.ReLU(),
+        #    #nn.MaxPool1d(kernel_size=5,padding=2),
+        #    # nn.MaxPool1d(2, padding="same"),
+        #    CyclicPad(),
+        #    nn.Conv1d(8 * dim, 16 * dim, 5, padding="same", bias=False),
+        #    nn.BatchNorm1d(16 * dim),
+        #    nn.ReLU(),
+        #    #nn.MaxPool1d(kernel_size=5,padding=2),
+        #    # nn.MaxPool1d(2, padding="same"),
+        #    CyclicPad(),
+        #    nn.Conv1d(16 * dim, 32 * dim, 5, padding="same", bias=False),
+        #    nn.BatchNorm1d(32 * dim),
+        #    nn.ReLU(),
+        #    #nn.MaxPool1d(kernel_size=5,padding=2),
+        #    # nn.MaxPool1d(2, padding="same"),
+        #    CyclicPad(),
+        #    nn.Conv1d(32 * dim, 64 * dim, 5, padding="same", bias=False),
+        #    nn.BatchNorm1d(64 * dim),
+        #    nn.ReLU(),
+        #    #nn.MaxPool1d(kernel_size=5,padding=2),
+        #    # nn.MaxPool1d(2, padding="same"),
+        #    CyclicPad(),
+        #    nn.Conv1d(64 * dim, 128 * dim, 5, padding="same", bias=False),
+        #    nn.BatchNorm1d(128 * dim),
+        #    nn.ReLU(),
+        #    #nn.MaxPool1d(kernel_size=5,padding=2),
+        #    # nn.MaxPool1d(2, padding="same"),
+        #    CyclicPad(),
+        #    nn.Conv1d(128 * dim, 256 * dim, 5, padding="same", bias=False),
+        #    nn.BatchNorm1d(256 * dim),
+        #    nn.ReLU(),
             #nn.MaxPool1d(kernel_size=5,padding=2),
             # nn.MaxPool1d(2, padding="same"),
             # nn.LeakyReLU(negative_slope=0.2),
@@ -162,7 +214,7 @@ class DistanceModel(LightningModule):
             #            nn.BatchNorm1d(512),
             #            nn.LeakyReLU(negative_slope=0.2)
             #            nn.LeakyReLU(negative_slope=0.2),
-        )
+        #)
         #self.fc = nn.Sequential(
         #    nn.Flatten(),
         #    nn.Linear(
@@ -177,7 +229,33 @@ class DistanceModel(LightningModule):
         #    nn.ReLU(),
         #    nn.Linear(4 * dim, 1),
         #)
+        #self.linear = nn.Sequential(nn.Linear(512, 256),
+        #                            #nn.BatchNorm1d(),
+        #                            nn.ReLU(),
+        #                            nn.Linear(256,128),
+        #                            #nn.BatchNorm1d(128),
+        #                            nn.ReLU(),
+        #                            nn.Linear(128,64),
+        #                            #nn.BatchNorm1d(64),
+        #                            nn.ReLU(),
+        #                            nn.Linear(64,32),
+        #                            #nn.BatchNorm1d(32),
+        #                            nn.ReLU(),
+        #                            nn.Linear(32,16),
+        #                            #nn.BatchNorm1d(16),
+        #                            nn.ReLU(),
+        #                            nn.Linear(16,8),
+        #                            #nn.BatchNorm1d(8),
+        #                            nn.ReLU(),
+        #                            nn.Linear(8,4),
+        #                            #nn.BatchNorm1d(4),
+        #                            nn.ReLU(),
+        #                            nn.Linear(4,2),
+        #                            #nn.BatchNorm1d(2),
+        #                            nn.ReLU()
+        #                            )
         self.layer_norm = LayerNorm()
+        
 
     def forward(self, x):
         c1 = x[0][:, :self.dim, :]
@@ -191,7 +269,14 @@ class DistanceModel(LightningModule):
 
         #        out_to_fc = nn.AvgPool1d(2)(out_cat).squeeze() #FIXME: Think this is destroying all the featurization ; flatten instead
         #dist = self.fc(out_cat).squeeze()
-        dist = self.layer_norm(out_c1, out_c2)
+        # Bring the high dimensional shapes to a lower dimension before calculating norm
+        #out_c1_linear = out_c1.permute(0, 2, 1)
+        #out_c2_linear = out_c2.permute(0, 2, 1)
+        #c1_low_dim = self.linear(out_c1_linear)
+        #c2_low_dim = self.linear(out_c2_linear)
+        out_c1_linear = self.linear_layer(out_c1)
+        out_c2_linear = self.linear_layer(out_c2)
+        dist = self.layer_norm(out_c1_linear, out_c2_linear)
 
         return dist
 
@@ -215,7 +300,7 @@ class DistanceModel(LightningModule):
             "optimizer": optimizer,
             "lr_scheduler": {
                 "scheduler": ReduceLROnPlateau(
-                    optimizer, mode="min", patience=50, factor=0.5
+                    optimizer, mode="min", patience=50, factor=0.75
                 ),
                 "interval": "epoch",
                 "frequency": 1,
