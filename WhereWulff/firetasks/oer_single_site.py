@@ -77,7 +77,10 @@ class OERSingleSiteFireTask(FiretaskBase):
         # applied_pH = 0  # pH conditions
         user_point = np.array([applied_pH, applied_potential])
         # ORR
-        user_point[1] = 0.9
+        # user_point[1] = 0.9
+        reduced_formula = [k for k in fw_spec if "surface_pbx" in k][0][
+            :-16
+        ]  # because of non-stoichiometry
 
         parent_dict = fw_spec[f"{reduced_formula}_{miller_index}_surface_pbx"]
         surface_pbx_uuid = parent_dict["surface_pbx_uuid"]
@@ -96,7 +99,7 @@ class OERSingleSiteFireTask(FiretaskBase):
         surface_termination = self._get_surface_stable_termination(
             user_point, clean_2_oh_list, oh_2_ox_list
         )
-        #FIXME: force a clean termination for now
+        # FIXME: force a clean termination for now
         surface_termination = "clean"
 
         # breakpoint()
