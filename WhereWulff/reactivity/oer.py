@@ -634,6 +634,10 @@ class OER_SingleSite(object):
             o2_star_intermediates = self._get_oer_intermediates(
                 self.adsorbates["OOH_up"], suffix="*"
             )
+            ch3oh_intermediates = self._get_oer_intermediates(self.adsorbates["CH3OH"])
+            ch3o_intermediates = self._get_oer_intermediates(self.adsorbates["CH3O"])
+            ch2o_intermediates = self._get_oer_intermediates(self.adsorbates["CH2O"])
+            cho_intermediates = self._get_oer_intermediates(self.adsorbates["CHO"])
             if self.checkpoint_path:
                 configs = [
                     Slab.from_dict(oh_intermediates[k]) for k in oh_intermediates.keys()
@@ -654,6 +658,86 @@ class OER_SingleSite(object):
                 )
 
                 oh_intermediates = {f"OH_{slab_index}": slab_ads.as_dict()}
+                configs = [
+                    Slab.from_dict(ch3oh_intermediates[k])
+                    for k in ch3oh_intermediates.keys()
+                ]
+                slab_ads, slab_index = find_most_stable_config(
+                    configs, self.checkpoint_path
+                )
+                # Cast the Struct to Slab so can add metadata
+                slab_ads = Slab(
+                    slab_ads.lattice,
+                    slab_ads.species,
+                    slab_ads.frac_coords,
+                    miller_index=configs[0].miller_index,
+                    oriented_unit_cell=configs[0].oriented_unit_cell,
+                    shift=0,
+                    scale_factor=0,
+                    site_properties=slab_ads.site_properties,
+                )
+
+                ch3oh_intermediates = {f"ch3oh_{slab_index}": slab_ads.as_dict()}
+                configs = [
+                    Slab.from_dict(ch3o_intermediates[k])
+                    for k in ch3o_intermediates.keys()
+                ]
+                slab_ads, slab_index = find_most_stable_config(
+                    configs, self.checkpoint_path
+                )
+                # Cast the Struct to Slab so can add metadata
+                slab_ads = Slab(
+                    slab_ads.lattice,
+                    slab_ads.species,
+                    slab_ads.frac_coords,
+                    miller_index=configs[0].miller_index,
+                    oriented_unit_cell=configs[0].oriented_unit_cell,
+                    shift=0,
+                    scale_factor=0,
+                    site_properties=slab_ads.site_properties,
+                )
+
+                ch3o_intermediates = {f"ch3o_{slab_index}": slab_ads.as_dict()}
+                configs = [
+                    Slab.from_dict(ch2o_intermediates[k])
+                    for k in ch2o_intermediates.keys()
+                ]
+                slab_ads, slab_index = find_most_stable_config(
+                    configs, self.checkpoint_path
+                )
+                # Cast the Struct to Slab so can add metadata
+                slab_ads = Slab(
+                    slab_ads.lattice,
+                    slab_ads.species,
+                    slab_ads.frac_coords,
+                    miller_index=configs[0].miller_index,
+                    oriented_unit_cell=configs[0].oriented_unit_cell,
+                    shift=0,
+                    scale_factor=0,
+                    site_properties=slab_ads.site_properties,
+                )
+
+                ch2o_intermediates = {f"ch2o_{slab_index}": slab_ads.as_dict()}
+                configs = [
+                    Slab.from_dict(cho_intermediates[k])
+                    for k in cho_intermediates.keys()
+                ]
+                slab_ads, slab_index = find_most_stable_config(
+                    configs, self.checkpoint_path
+                )
+                # Cast the Struct to Slab so can add metadata
+                slab_ads = Slab(
+                    slab_ads.lattice,
+                    slab_ads.species,
+                    slab_ads.frac_coords,
+                    miller_index=configs[0].miller_index,
+                    oriented_unit_cell=configs[0].oriented_unit_cell,
+                    shift=0,
+                    scale_factor=0,
+                    site_properties=slab_ads.site_properties,
+                )
+
+                cho_intermediates = {f"cho_{slab_index}": slab_ads.as_dict()}
                 ooh_intermediates = {**ooh_down, **ooh_up}
                 configs = [
                     Slab.from_dict(ooh_intermediates[k])
@@ -697,6 +781,10 @@ class OER_SingleSite(object):
                     **oh_intermediates,
                     **ooh_intermediates,
                     **o2_star_intermediates,
+                    **ch3oh_intermediates,
+                    **ch3o_intermediates,
+                    **ch2o_intermediates,
+                    **cho_intermediates,
                 }
             else:
                 oer_intermediates = {
