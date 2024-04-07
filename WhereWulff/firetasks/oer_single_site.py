@@ -96,6 +96,8 @@ class OERSingleSiteFireTask(FiretaskBase):
         surface_termination = self._get_surface_stable_termination(
             user_point, clean_2_oh_list, oh_2_ox_list
         )
+        #FIXME: force a clean termination for now
+        surface_termination = "clean"
 
         # breakpoint()
         # Retrieve the surface termination clean/OH/Ox geometries
