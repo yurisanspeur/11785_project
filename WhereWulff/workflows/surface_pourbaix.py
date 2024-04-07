@@ -41,7 +41,7 @@ class SurfaceCoverageML(object):
 
     def __init__(self, slab_ref, slab, adsorbate, is_metal, checkpoint_path):
 
-        breakpoint()
+        #breakpoint()
 
         self.checkpoint_path = checkpoint_path
         # Init Mxide
@@ -114,7 +114,7 @@ class SurfaceCoverageML(object):
         # Loop
         counter = 0
         occ_site_indices = []
-        while remaining_site_indices and counter < 1:  # 1/8 ML
+        while remaining_site_indices:  # and counter < 1:  # 1/8 ML
             if len(remaining_site_indices) == len(self.bulk_like_shifted):
                 slab_ads = slab.copy()
                 previous_site_1, previous_site_2 = None, None
