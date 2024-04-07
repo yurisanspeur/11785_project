@@ -1,5 +1,6 @@
 import numpy as np
 from pymatgen.core.structure import Molecule
+from pymatgen.core import Structure
 
 
 """
@@ -29,8 +30,58 @@ OOH_down = Molecule(
     [[0, 0, 0], [-1.067, -0.403, 0.796], [-1.84688848, -0.68892498, 0.25477651]],
     site_properties={"magmom": [0.6, 0.6, 0.1], "binding_site": [True, False, False]},
 )
+# CH3OH, CH3O, CH2O, CHO adsorbates
+#### METHANOL ######
+struct_methanol = Structure.from_file("POSCAR_methanol_vasp_opt")
+# Recenter and make the Oxygen specie that first atom in line
+cart_coords = struct_methanol.cart_coords
+center_cart_coords = cart_coords - cart_coords[-1]
+species = [x.symbol for x in reversed(struct_methanol.species)]
+mol_methanol = Molecule(species, np.array([x for x in reversed(center_cart_coords)]))
+mol_methanol.add_site_property(
+    "binding_site", [True, False, False, False, False, False]
+)
+mol_methanol.add_site_property("magmom", [0.6, 0.1, 0.1, 0.1, 0.1, 0.1])
+#### METHOXY ######
+struct_methoxy = Structure.from_file("POSCAR_relaxed_tilted_methoxy")
+# Recenter and make the Oxygen specie that first atom in line
+cart_coords = struct_methoxy.cart_coords
+center_cart_coords = cart_coords - cart_coords[-1]
+species = [x.symbol for x in reversed(struct_methoxy.species)]
+mol_methoxy = Molecule(species, np.array([x for x in reversed(center_cart_coords)]))
+mol_methoxy.add_site_property("binding_site", [True, False, False, False, False])
+mol_methoxy.add_site_property("magmom", [0.6, 0.1, 0.1, 0.1, 0.1])
+#### FORMALDEHYDE ######
+struct_formaldehyde = Structure.from_file("POSCAR_relaxed_tilted_formaldehyde")
+# Recenter and make the Oxygen specie that first atom in line
+cart_coords = struct_formaldehyde.cart_coords
+center_cart_coords = cart_coords - cart_coords[-1]
+species = [x.symbol for x in reversed(struct_formaldehyde.species)]
+mol_formaldehyde = Molecule(
+    species, np.array([x for x in reversed(center_cart_coords)])
+)
+mol_formaldehyde.add_site_property("binding_site", [True, False, False, False])
+mol_formaldehyde.add_site_property("magmom", [0.6, 0.1, 0.1, 0.1])
+#### CHO ######
+struct_CHO = Structure.from_file("POSCAR_relaxed_tilted_CHO")
+# Recenter and make the Oxygen specie that first atom in line
+cart_coords = struct_CHO.cart_coords
+center_cart_coords = cart_coords - cart_coords[-1]
+species = [x.symbol for x in reversed(struct_CHO.species)]
+mol_CHO = Molecule(species, np.array([x for x in reversed(center_cart_coords)]))
+mol_CHO.add_site_property("binding_site", [True, False, False])
+mol_CHO.add_site_property("magmom", [0.6, 0.1, 0.1])
 
-oer_adsorbates_dict = {"OH": OH, "Ox": Ox, "OOH_up": OOH_up, "OOH_down": OOH_down}
+oer_adsorbates_dict = {
+    "OH": OH,
+    "Ox": Ox,
+    "OOH_up": OOH_up,
+    "OOH_down": OOH_down,
+    "CH3OH": mol_methanol,
+    "CH3O": mol_methoxy,
+    "CH2O": mol_formaldehyde,
+    "CHO": mol_CHO,
+}
 
 O2 = Molecule(["O", "O"], [[0, 0, 0], [0, 0, 1.208]])
 O2_like = O2.copy()
@@ -60,7 +111,7 @@ H2O = Molecule(
         [2.226191, -8.287900, 2.667037],
         [2.226191, -9.143303, 2.156037],
     ],
-    site_properties={"magmom":[0.1,0.1,0.6], "binding_site":[False, False, True]}
+    site_properties={"magmom": [0.1, 0.1, 0.6], "binding_site": [False, False, True]},
 )
 
 # Deacon process
