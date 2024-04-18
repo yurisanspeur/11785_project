@@ -11,8 +11,9 @@ from matplotlib import pyplot as plt
 import os
 import math
 
+
 class ShapeDataset(torch.utils.data.Dataset):
-    def __init__(self, path='Fab_data'):
+    def __init__(self, path="Fab_data"):
         self.path = path
 
     def __len__(self):
@@ -27,54 +28,53 @@ class MyDataModule(LightningDataModule):
     def __init__(
         self,
         batch_size,
-        train_set,                                                                          
-        val_set,                                                                            
-        test_set,                                                                           
-        train_collate_fn=None,                                                              
-        val_collate_fn=None,                                                                
-        test_collate_fn=None,                                                               
-    ):                                                                                                                                                                                   
-        self.train_set = train_set                                                          
-        self.val_set = val_set                                                              
-        self.test_set = test_set                                                            
-        self.batch_size = batch_size                                                        
-        self.train_collate_fn = train_collate_fn                                            
-        self.val_collate_fn = val_collate_fn                                                
-        self.test_collate_fn = test_collate_fn                                              
-                                                                                            
-    def train_dataloader(self):                                                                                                                                                          
-        return DataLoader(                                                                  
-            self.train_set,                                                                 
-            batch_size=self.batch_size,                                                                                                                                                  
-            shuffle=True,                                                                   
-            pin_memory=True,                                                                
-            num_workers=8,                                                                                                                                                               
-            persistent_workers=True,                                                        
-            collate_fn=self.train_collate_fn,                                               
-        )                                                                                   
-                                                                                            
-    def val_dataloader(self):                                                               
-        return DataLoader(                                                                  
-            self.val_set,                                                                                                                                                                
-            batch_size=self.batch_size,                                                     
-            shuffle=False,                                                                                                                                                               
-            pin_memory=True,                                                                
-            persistent_workers=True,                                                        
-            num_workers=8,                                                                  
-            collate_fn=self.val_collate_fn,                                                 
-        )                                                                                   
-                                                                                            
-    def test_dataloader(self):                                                              
-        return DataLoader(                                                                  
-            self.test_set,                                                                  
-            batch_size=self.batch_size,                                                     
-            shuffle=False,                                                                                                                                                               
-            pin_memory=True,                                                                
-            persistent_workers=True,                                                        
-            num_workers=8,
-            collate_fn=self.test_collate_fn,
+        train_set,
+        val_set,
+        test_set,
+        train_collate_fn=None,
+        val_collate_fn=None,
+        test_collate_fn=None,
+    ):
+        self.train_set = train_set
+        self.val_set = val_set
+        self.test_set = test_set
+        self.batch_size = batch_size
+        self.train_collate_fn = train_collate_fn
+        self.val_collate_fn = val_collate_fn
+        self.test_collate_fn = test_collate_fn
+
+    def train_dataloader(self):
+        return DataLoader(
+            self.train_set,
+            batch_size=self.batch_size,
+            shuffle=True,
+            pin_memory=True,
+            num_workers=4,
+            persistent_workers=True,
+            collate_fn=self.train_collate_fn,
         )
 
+    def val_dataloader(self):
+        return DataLoader(
+            self.val_set,
+            batch_size=self.batch_size,
+            shuffle=False,
+            pin_memory=True,
+            persistent_workers=True,
+            num_workers=4,
+            collate_fn=self.val_collate_fn,
+        )
+
+    def test_dataloader(self):
+        return DataLoader(
+            self.test_set,
+            batch_size=self.batch_size,
+            shuffle=False,
+            pin_memory=True,
+            persistent_workers=True,
+            num_workers=4,
+            collate_fn=self.test_collate_fn,
+        )
 
 
 class CyclicPad(nn.Module):
@@ -82,45 +82,42 @@ class CyclicPad(nn.Module):
         super(CyclicPad, self).__init__(**kwargs)
         self.kernelsize = 5
 
-    def forward(self, inputs): # (B, F, N)
+    def forward(self, inputs):  # (B, F, N)
 
-        length = inputs.shape[2] # number of samples 100
-        n = math.floor(self.kernelsize / 2) # 2
-        #a = inputs[:, length - n : length, :]
-        #b = inputs[:, 0:n, :]
-        a = inputs[:, :,length - n : length]
+        length = inputs.shape[2]  # number of samples 100
+        n = math.floor(self.kernelsize / 2)  # 2
+        # a = inputs[:, length - n : length, :]
+        # b = inputs[:, 0:n, :]
+        a = inputs[:, :, length - n : length]
         b = inputs[:, :, 0:n]
 
         return torch.cat([a, inputs, b], dim=2)
 
 
 class LayerNorm(nn.Module):
-
     def __init__(self):
         super(LayerNorm, self).__init__()
 
     def forward(self, c1, c2):
-        return torch.sum((c1 - c2) ** 2,dim=(1,2))
+        return torch.sum((c1 - c2) ** 2, dim=(1, 2))
 
 
 class ConvBlock(nn.Module):
-
     def __init__(self, in_features, out_features):
         super(ConvBlock, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
         self.cyclic_pad = CyclicPad()
-        self.conv = nn.Conv1d(in_features, out_features,5, padding="same",bias=False)
+        self.conv = nn.Conv1d(in_features, out_features, 5, padding="same", bias=False)
         self.bn = nn.BatchNorm1d(out_features)
         self.relu = nn.ReLU()
-
 
     def forward(self, x):
         x = self.relu(self.bn(self.conv(self.cyclic_pad(x))))
         return x
 
-class LinearBlock(nn.Module):
 
+class LinearBlock(nn.Module):
     def __init__(self, in_features, out_features):
         super(LinearBlock, self).__init__()
         self.in_features = in_features
@@ -130,9 +127,9 @@ class LinearBlock(nn.Module):
         self.relu = nn.ReLU()
 
     def forward(self, x):
-        x = x.permute(0,2,1) # so that batchnorm acts on feature dimension
+        x = x.permute(0, 2, 1)  # so that batchnorm acts on feature dimension
         x = self.lin(x)
-        x = x.permute(0,2,1) # B,F,N
+        x = x.permute(0, 2, 1)  # B,F,N
         x = self.bn(x)
         x = self.relu(x)
         return x
@@ -142,23 +139,27 @@ class DistanceModel(LightningModule):
     def __init__(self, dim, num_conv_blocks):
         super(DistanceModel, self).__init__()
         self.dim = dim
-        conv_blocks = [ConvBlock(dim, 2*dim)]
+        conv_blocks = [ConvBlock(dim, 2 * dim)]
         for i in range(num_conv_blocks - 1):
             in_features = conv_blocks[i].out_features
-            conv_blocks.append(ConvBlock(in_features, 2*in_features))
+            conv_blocks.append(ConvBlock(in_features, 2 * in_features))
 
         self.conv_layer = nn.Sequential(*conv_blocks)
-        linear_blocks = [LinearBlock(conv_blocks[-1].out_features,int(conv_blocks[-1].out_features/2))]
+        # linear_blocks = [
+        #    LinearBlock(
+        #        conv_blocks[-1].out_features, int(conv_blocks[-1].out_features / 2)
+        #    )
+        # ]
 
-        lin_features = int(linear_blocks[-1].out_features)
-        while lin_features >= 4:
-            lin_features = int(linear_blocks[-1].out_features)
-            linear_blocks.append(LinearBlock(lin_features, int(lin_features/2)))
-            lin_features /= 2
+        # lin_features = int(linear_blocks[-1].out_features)
+        # while lin_features >= 4:
+        #    lin_features = int(linear_blocks[-1].out_features)
+        #    linear_blocks.append(LinearBlock(lin_features, int(lin_features / 2)))
+        #    lin_features /= 2
 
-        self.linear_layer = nn.Sequential(*linear_blocks)
+        # self.linear_layer = nn.Sequential(*linear_blocks)
 
-        #self.conv_layer = nn.Sequential(
+        # self.conv_layer = nn.Sequential(
         #    CyclicPad(),
         #    nn.Conv1d(dim, 2 * dim, 5, padding="same", bias=False),
         #    nn.BatchNorm1d(2 * dim),
@@ -202,20 +203,20 @@ class DistanceModel(LightningModule):
         #    nn.Conv1d(128 * dim, 256 * dim, 5, padding="same", bias=False),
         #    nn.BatchNorm1d(256 * dim),
         #    nn.ReLU(),
-            #nn.MaxPool1d(kernel_size=5,padding=2),
-            # nn.MaxPool1d(2, padding="same"),
-            # nn.LeakyReLU(negative_slope=0.2),
-            #            nn.LeakyReLU(negative_slope=0.2),
-            #            nn.Conv1d(128, 256, 5, padding="same", bias=False),
-            #            nn.BatchNorm1d(256),
-            #            nn.LeakyReLU(negative_slope=0.2),
-            #            #            nn.LeakyReLU(negative_slope=0.2),
-            #            nn.Conv1d(256, 512, 5, padding="same", bias=False),
-            #            nn.BatchNorm1d(512),
-            #            nn.LeakyReLU(negative_slope=0.2)
-            #            nn.LeakyReLU(negative_slope=0.2),
-        #)
-        #self.fc = nn.Sequential(
+        # nn.MaxPool1d(kernel_size=5,padding=2),
+        # nn.MaxPool1d(2, padding="same"),
+        # nn.LeakyReLU(negative_slope=0.2),
+        #            nn.LeakyReLU(negative_slope=0.2),
+        #            nn.Conv1d(128, 256, 5, padding="same", bias=False),
+        #            nn.BatchNorm1d(256),
+        #            nn.LeakyReLU(negative_slope=0.2),
+        #            #            nn.LeakyReLU(negative_slope=0.2),
+        #            nn.Conv1d(256, 512, 5, padding="same", bias=False),
+        #            nn.BatchNorm1d(512),
+        #            nn.LeakyReLU(negative_slope=0.2)
+        #            nn.LeakyReLU(negative_slope=0.2),
+        # )
+        # self.fc = nn.Sequential(
         #    nn.Flatten(),
         #    nn.Linear(
         #        256 * dim * length * 2, 256 * dim
@@ -228,8 +229,8 @@ class DistanceModel(LightningModule):
         #    nn.Linear(16 * dim, 4 * dim),
         #    nn.ReLU(),
         #    nn.Linear(4 * dim, 1),
-        #)
-        #self.linear = nn.Sequential(nn.Linear(512, 256),
+        # )
+        # self.linear = nn.Sequential(nn.Linear(512, 256),
         #                            #nn.BatchNorm1d(),
         #                            nn.ReLU(),
         #                            nn.Linear(256,128),
@@ -255,43 +256,77 @@ class DistanceModel(LightningModule):
         #                            nn.ReLU()
         #                            )
         self.layer_norm = LayerNorm()
-        
 
     def forward(self, x):
-        c1 = x[0][:, :self.dim, :]
-        c2 = x[0][:, self.dim:,:]
-        #c1_perm = c1.permute(0, 2, 1)
-        #c2_perm = c2.permute(0, 2, 1)
+        c1 = x[0][:, : self.dim, :]  # We treat this as our intake
+        # c1.requires_grad_(True)
+        c2 = x[0][:, self.dim :, :]  # We treat this as our target shape
+        # c2.requires_grad_(True)
+        # c1_perm = c1.permute(0, 2, 1)
+        # c2_perm = c2.permute(0, 2, 1)
         out_c1 = self.conv_layer(c1)
         out_c2 = self.conv_layer(c2)
         # concatenate the two representations
-        #out_cat = torch.cat((out_c1.permute(0, 2, 1), out_c2.permute(0, 2, 1)), axis=2)
+        # out_cat = torch.cat((out_c1.permute(0, 2, 1), out_c2.permute(0, 2, 1)), axis=2)
 
         #        out_to_fc = nn.AvgPool1d(2)(out_cat).squeeze() #FIXME: Think this is destroying all the featurization ; flatten instead
-        #dist = self.fc(out_cat).squeeze()
+        # dist = self.fc(out_cat).squeeze()
         # Bring the high dimensional shapes to a lower dimension before calculating norm
-        #out_c1_linear = out_c1.permute(0, 2, 1)
-        #out_c2_linear = out_c2.permute(0, 2, 1)
-        #c1_low_dim = self.linear(out_c1_linear)
-        #c2_low_dim = self.linear(out_c2_linear)
-        out_c1_linear = self.linear_layer(out_c1)
-        out_c2_linear = self.linear_layer(out_c2)
-        dist = self.layer_norm(out_c1_linear, out_c2_linear)
-
+        # out_c1_linear = out_c1.permute(0, 2, 1)
+        # out_c2_linear = out_c2.permute(0, 2, 1)
+        # c1_low_dim = self.linear(out_c1_linear)
+        # c2_low_dim = self.linear(out_c2_linear)
+        # out_c1_linear = self.linear_layer(out_c1)
+        # out_c2_linear = self.linear_layer(out_c2)
+        # dist = self.layer_norm(out_c1_linear, out_c2_linear)
+        dist = self.layer_norm(out_c1, out_c2)
+        # grad = torch.autograd.grad(
+        #    dist,
+        #    c1,
+        #    grad_outputs=torch.ones_like(dist),
+        #    create_graph=True,
+        # )[0]
         return dist
+
+    def predict_step(self, batch, batch_idx):
+        x, ind = batch
+        dist = self(batch)
+        #print(x, ind, f"dev:{self.device}")
+        return dist, ind
+
+    def on_predict_epoch_end(self, results):
+
+        results = self.all_gather(results)  # tuple of pred_dists, batch_idx
+        # Sort results by index to guarantee ordering
+        # sorted_results = sorted(results, key=lambda x: x[1])
+        # results = torch.concat([x.cpu() for x in results], dim=1)
+        all_dists = []
+        all_indcs = []
+        for batch_dist, batch_index in results[0]:
+            # Flatten based on number of devices
+            all_dists.append(torch.flatten(batch_dist))
+            all_indcs.append(torch.flatten(batch_index))
+        dists = torch.cat(all_dists).cpu().numpy().tolist()
+        indcs = torch.cat(all_indcs).cpu().numpy().tolist()
+        sorted_dists = torch.tensor(
+            [d for d, i in sorted(zip(dists, indcs), key=lambda x: x[1])]
+        )
+        #print(sorted_dists, len(sorted_dists))
+        torch.save(sorted_dists, "results.pt")
+        # Persist to disk since return does not do anything
 
     def training_step(self, batch, batch_idx):
         preds = self(batch).squeeze()
         targs = batch[1].squeeze()
         loss = nn.L1Loss()(preds, targs.type(preds.dtype))
-        self.log("training_loss", loss, on_epoch=True)
+        self.log("training_loss", loss, on_epoch=True, sync_dist=True)
         return {"loss": loss}
 
     def validation_step(self, batch, batch_idx):
         preds = self(batch).squeeze()
         targs = batch[1].squeeze()
         loss = nn.L1Loss()(preds, targs.type(preds.dtype))
-        self.log("val_loss", loss, on_epoch=True)
+        self.log("val_loss", loss, on_epoch=True, sync_dist=True)
         return {"val_loss": loss}
 
     def configure_optimizers(self):
@@ -300,7 +335,7 @@ class DistanceModel(LightningModule):
             "optimizer": optimizer,
             "lr_scheduler": {
                 "scheduler": ReduceLROnPlateau(
-                    optimizer, mode="min", patience=50, factor=0.75
+                    optimizer, mode="min", patience=20, factor=0.8, min_lr=1e-6
                 ),
                 "interval": "epoch",
                 "frequency": 1,
